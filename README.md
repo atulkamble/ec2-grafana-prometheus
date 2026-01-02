@@ -1,107 +1,147 @@
-# 📊 EC2 Grafana Deployment
+# 📊 Grafana & Prometheus Installation on AWS EC2
 
-This project provides step-by-step instructions to deploy **Grafana Enterprise** on an AWS EC2 instance.
+## 🔹 Environment Details
 
----
-
-## 📦 Prerequisites
-
-* AWS Account with permissions to launch EC2 instances
-* SSH key pair for EC2 access
-* Security Group allowing required ports:
-
-  * **22** (SSH)
-  * **80** (HTTP)
-  * **443** (HTTPS)
-  * **3000** (Grafana)
-  * **9090** (Prometheus)
+| Component     | Value          |
+| ------------- | -------------- |
+| Cloud         | AWS            |
+| Service       | EC2            |
+| Instance Type | `t3.medium`    |
+| OS            | Amazon Linux 2 |
+| Key Pair      | `grafana.pem`  |
+| User          | `ec2-user`     |
 
 ---
 
-## 🚀 EC2 Instance Launch & Setup
+![Image](https://d2908q01vomqb2.cloudfront.net/ca3512f4dfa95a03169c5a670a4c91a19b3077b4/2021/04/19/koffir_prometheus_monitor_ec2_f1_new.png)
 
-### 1️⃣ Launch EC2 Instance
+![Image](https://prometheus.io/assets/docs/grafana_qps_graph.png)
 
-* Choose **Amazon Linux 2 AMI**
-* Instance type: `t2.micro` (or higher)
-* Attach the following **Security Group** rules:
+![Image](https://eadn-wc03-4064062.nxedge.io/cdn/wp-content/uploads/2021/06/Prometheus-Server_Chart.png)
 
-| Type       | Protocol | Port Range | Source    |
-| ---------- | -------- | ---------- | --------- |
-| SSH        | TCP      | 22         | Your IP   |
-| HTTP       | TCP      | 80         | 0.0.0.0/0 |
-| HTTPS      | TCP      | 443        | 0.0.0.0/0 |
-| Custom TCP | TCP      | 3000       | 0.0.0.0/0 |
+![Image](https://media.licdn.com/dms/image/v2/D5612AQGmaf97dCRh-w/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1681294143595?e=2147483647\&t=WQV1V_z5Te9L7B6JRAggbtQBZKO_Wdxjo80gTF7zusc\&v=beta)
 
 ---
 
-### 2️⃣ Connect to EC2 via SSH
+## 🧩 Architecture Overview
+
+* **Grafana** → Visualization layer (Port `3000`)
+* **Prometheus** → Metrics collection & storage (Port `9090`)
+* **EC2** → Hosts both services
+* **Systemd** → Manages Prometheus & Grafana as services
+
+---
+
+## 🔹 Step 1: Update EC2 System
 
 ```bash
-ssh -i "your-key.pem" ec2-user@your-ec2-public-ip
+sudo yum update -y
 ```
 
 ---
 
-## 📥 Install Grafana Enterprise
+## 🔹 Step 2: Install Grafana (Enterprise Edition)
 
-Run the following commands on the EC2 instance:
+### Install Grafana RPM
 
 ```bash
-sudo yum install -y https://dl.grafana.com/enterprise/release/grafana-enterprise-12.0.2-1.x86_64.rpm
-grafana --version
-sudo systemctl start grafana-server
+sudo yum install -y https://dl.grafana.com/grafana-enterprise/release/12.3.1/grafana-enterprise_12.3.1_20271043721_linux_amd64.rpm
+```
+
+### Verify Grafana Version
+
+```bash
+grafana-server --version
+```
+
+---
+
+## 🔹 Step 3: Start & Enable Grafana Service
+
+```bash
 sudo systemctl enable grafana-server
+sudo systemctl start grafana-server
+sudo systemctl status grafana-server
+```
+
+✅ **Grafana Web UI**
+
+```
+http://<EC2-PUBLIC-IP>:3000
+```
+
+**Default Credentials**
+
+* Username: `admin`
+* Password: `admin`
+
+---
+
+## 🔹 Step 4: Copy Prometheus Binary to EC2
+
+### SCP from Local Machine (macOS/Linux)
+
+```bash
+scp -i /Users/atul/Downloads/grafana.pem \
+/Users/atul/Downloads/prometheus-3.9.0-rc.0.linux-amd64.tar.gz \
+ec2-user@ec2-107-23-150-235.compute-1.amazonaws.com:/home/ec2-user/
 ```
 
 ---
 
-## Install Prometheus 
-// script
+## 🔹 Step 5: Move & Extract Prometheus
+
+```bash
+sudo mv prometheus-3.9.0-rc.0.linux-amd64.tar.gz /opt
+cd /opt
+sudo tar -xvf prometheus-3.9.0-rc.0.linux-amd64.tar.gz
+sudo mv prometheus-3.9.0-rc.0.linux-amd64 prometheus
+sudo rm prometheus-3.9.0-rc.0.linux-amd64.tar.gz
 ```
-#!/bin/bash
 
-echo "🔄 Updating system packages..."
-sudo dnf update -y
+---
 
-echo "📦 Installing Grafana Enterprise..."
-GRAFANA_RPM="https://dl.grafana.com/enterprise/release/grafana-enterprise-12.0.2-1.x86_64.rpm"
-sudo dnf install -y $GRAFANA_RPM
+## 🔹 Step 6: Create Prometheus System User
 
-echo "✅ Grafana installed successfully."
-grafana_version=$(grafana-server -v | head -n 1)
-echo "🧾 Version: $grafana_version"
+```bash
+sudo useradd --no-create-home --shell /bin/false prometheus
+```
 
-echo "🚀 Starting and enabling Grafana service..."
-sudo systemctl enable --now grafana-server
-sudo systemctl status grafana-server --no-pager
+---
 
-echo "🧑 Adding prometheus user (if not exists)..."
-if id "prometheus" &>/dev/null; then
-    echo "ℹ️ User 'prometheus' already exists."
-else
-    sudo useradd --no-create-home --shell /sbin/nologin prometheus
-fi
+## 🔹 Step 7: Configure Prometheus Directories
 
-echo "📁 Creating Prometheus directories..."
-sudo mkdir -p /etc/prometheus /var/lib/prometheus
-sudo chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
+```bash
+cd /opt/prometheus
 
-echo "⬇️ Downloading Prometheus..."
-cd /tmp
-PROM_VERSION="2.52.0"
-wget -q https://github.com/prometheus/prometheus/releases/download/v$PROM_VERSION/prometheus-$PROM_VERSION.linux-amd64.tar.gz
-tar -xzf prometheus-$PROM_VERSION.linux-amd64.tar.gz
+sudo cp prometheus /usr/local/bin/
+sudo cp promtool /usr/local/bin/
 
-echo "📂 Installing Prometheus binaries and config..."
-cd prometheus-$PROM_VERSION.linux-amd64
-sudo install -m 0755 prometheus promtool /usr/local/bin/
-sudo cp -r consoles console_libraries /etc/prometheus/
+sudo mkdir /etc/prometheus
+sudo mkdir /var/lib/prometheus
+
 sudo cp prometheus.yml /etc/prometheus/
-sudo chown -R prometheus:prometheus /etc/prometheus /usr/local/bin/prometheus /usr/local/bin/promtool
+```
 
-echo "📝 Creating Prometheus systemd service..."
-cat <<EOF | sudo tee /etc/systemd/system/prometheus.service
+### Set Permissions
+
+```bash
+sudo chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
+sudo chown prometheus:prometheus /usr/local/bin/prometheus
+sudo chown prometheus:prometheus /usr/local/bin/promtool
+```
+
+---
+
+## 🔹 Step 8: Create Prometheus systemd Service
+
+```bash
+sudo nano /etc/systemd/system/prometheus.service
+```
+
+### 📄 Paste the Following Configuration
+
+```ini
 [Unit]
 Description=Prometheus Monitoring
 Wants=network-online.target
@@ -111,63 +151,63 @@ After=network-online.target
 User=prometheus
 Group=prometheus
 Type=simple
-ExecStart=/usr/local/bin/prometheus \\
-  --config.file=/etc/prometheus/prometheus.yml \\
-  --storage.tsdb.path=/var/lib/prometheus/ \\
-  --web.console.templates=/etc/prometheus/consoles \\
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --web.console.templates=/etc/prometheus/consoles \
   --web.console.libraries=/etc/prometheus/console_libraries
 
 [Install]
 WantedBy=multi-user.target
-EOF
+```
 
-echo "🔄 Reloading systemd & starting Prometheus..."
-sudo systemctl daemon-reexec
+---
+
+## 🔹 Step 9: Start Prometheus Service
+
+```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now prometheus
-sudo systemctl status prometheus --no-pager
-
-echo "✅ Prometheus setup complete!"
-
-
+sudo systemctl enable prometheus
+sudo systemctl start prometheus
+sudo systemctl status prometheus
 ```
 
-
-
-## 🌐 Access Grafana
-
-Open your browser and visit:
+✅ **Prometheus Web UI**
 
 ```
-http://your-ec2-public-ip:3000
+http://<EC2-PUBLIC-IP>:9090
 ```
-
-* **Username:** `admin`
-* **Password:** `admin` (change after first login)
 
 ---
 
-## 📓 Notes
+## 🔹 Step 10: AWS Security Group Configuration
 
-* Ensure your **Security Group** allows inbound traffic on port **3000**.
-* Replace `your-ec2-public-ip` with the actual Public IPv4 address of your EC2 instance.
-
----
-
-## 📷 Example
-
-![Grafana Login](screenshots/grafana-login.png)
+| Service    | Port   | Protocol |
+| ---------- | ------ | -------- |
+| Grafana    | `3000` | TCP      |
+| Prometheus | `9090` | TCP      |
+| SSH        | `22`   | TCP      |
 
 ---
 
-## 📂 Project Structure
+## 🎯 Final Validation Checklist
 
-```
-ec2-grafana/
-├── README.md
-└── screenshots/
-    └── grafana-login.png
-```
+✔ Grafana running
+✔ Prometheus running
+✔ systemd services enabled
+✔ Ports opened in Security Group
+✔ Accessible via browser
+
+---
+
+## 🚀 Next Steps (Recommended)
+
+* Add **Prometheus as Grafana Data Source**
+* Install **Node Exporter**
+* Import **Grafana Dashboards**
+* Enable **Alertmanager**
+* Add **TLS + Authentication**
+* Convert setup into **Terraform / Ansible**
 
 ---
 
