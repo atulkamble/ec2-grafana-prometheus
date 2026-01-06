@@ -84,7 +84,7 @@ http://<EC2-PUBLIC-IP>:3000
 ```bash
 scp -i /Users/atul/Downloads/grafana.pem \
 /Users/atul/Downloads/prometheus-3.9.0-rc.0.linux-amd64.tar.gz \
-ec2-user@ec2-107-23-150-235.compute-1.amazonaws.com:/home/ec2-user/
+ec2-user@ec2-98-89-6-93.compute-1.amazonaws.com:/home/ec2-user/
 ```
 
 ---
