@@ -58,6 +58,10 @@ sudo nano /etc/prometheus/prometheus.yml
 ```
 
 ```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
 rule_files:
   - "alerts.yml"
 
@@ -66,6 +70,15 @@ alerting:
     - static_configs:
         - targets:
           - "localhost:9093"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node_exporter"
+    static_configs:
+      - targets: ["localhost:9100"]
 ```
 
 ---
