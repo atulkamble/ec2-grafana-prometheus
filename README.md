@@ -41,6 +41,96 @@ sudo yum update -y
 
 ---
 
+# 📊 Node Exporter Setup (Linux)
+
+## 🔹 Overview
+
+**Node Exporter** is a component of Prometheus used to collect system-level metrics like CPU, memory, disk, and network from Linux servers.
+
+---
+
+## 🔹 Step 10: Download & Extract
+
+```bash
+wget https://github.com/prometheus/node_exporter/releases/download/v1.10.2/node_exporter-1.10.2.linux-amd64.tar.gz
+tar xvfz node_exporter-1.10.2.linux-amd64.tar.gz
+cd node_exporter-1.10.2.linux-amd64
+```
+
+---
+
+## 🔹 Step 11: Run Manually (Test)
+
+```bash
+./node_exporter
+```
+
+👉 Access in browser:
+
+```
+http://<SERVER-IP>:9100/metrics
+```
+
+---
+
+## 🔹 Step 12: Install Binary & Create User
+
+```bash
+sudo cp node_exporter /usr/local/bin
+sudo useradd node_exporter --no-create-home --shell /bin/false
+sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
+```
+
+---
+
+## 🔹 Step 13: Create Systemd Service
+
+```bash
+sudo vi /etc/systemd/system/node_exporter.service
+```
+
+### Add below content:
+
+```ini
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter
+
+[Install]
+WantedBy=multi-user.target
+```
+
+---
+
+## 🔹 Step 14: Start & Enable Service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+sudo systemctl status node_exporter
+```
+
+---
+
+## 🔹 Step 15: Verify
+
+Open browser:
+
+```
+http://<SERVER-IP>:9100/metrics
+```
+
+✔ You should see system metrics output
+
+---
+
 ## 🔹 Step 2: Install Grafana (Enterprise Edition)
 
 ### Install Grafana RPM
@@ -210,97 +300,6 @@ sudo systemctl status prometheus
 ```
 http://<EC2-PUBLIC-IP>:9090
 ```
-
----
-
-# 📊 Node Exporter Setup (Linux)
-
-## 🔹 Overview
-
-**Node Exporter** is a component of Prometheus used to collect system-level metrics like CPU, memory, disk, and network from Linux servers.
-
----
-
-## 🔹 Step 10: Download & Extract
-
-```bash
-wget https://github.com/prometheus/node_exporter/releases/download/v1.10.2/node_exporter-1.10.2.linux-amd64.tar.gz
-tar xvfz node_exporter-1.10.2.linux-amd64.tar.gz
-cd node_exporter-1.10.2.linux-amd64
-```
-
----
-
-## 🔹 Step 11: Run Manually (Test)
-
-```bash
-./node_exporter
-```
-
-👉 Access in browser:
-
-```
-http://<SERVER-IP>:9100/metrics
-```
-
----
-
-## 🔹 Step 12: Install Binary & Create User
-
-```bash
-sudo cp node_exporter /usr/local/bin
-sudo useradd node_exporter --no-create-home --shell /bin/false
-sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
-```
-
----
-
-## 🔹 Step 13: Create Systemd Service
-
-```bash
-sudo vi /etc/systemd/system/node_exporter.service
-```
-
-### Add below content:
-
-```ini
-[Unit]
-Description=Node Exporter
-After=network.target
-
-[Service]
-User=node_exporter
-Group=node_exporter
-Type=simple
-ExecStart=/usr/local/bin/node_exporter
-
-[Install]
-WantedBy=multi-user.target
-```
-
----
-
-## 🔹 Step 14: Start & Enable Service
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl start node_exporter
-sudo systemctl enable node_exporter
-sudo systemctl status node_exporter
-```
-
----
-
-## 🔹 Step 15: Verify
-
-Open browser:
-
-```
-http://<SERVER-IP>:9100/metrics
-```
-
-✔ You should see system metrics output
-
 ---
 
 ## 🔹 Common Metrics Collected
